@@ -1,4 +1,4 @@
-import logging
+from logger import get_logger
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 
@@ -17,7 +17,7 @@ from service.fetcher import fetch_and_store_tles
 from service.pass_detector import run_pass_detection
 from service.scheduler import run_scheduler
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 router = APIRouter()
 
 

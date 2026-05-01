@@ -1,7 +1,23 @@
-import logging
 import requests
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
+from requests.adapters import HTTPAdapter
+from logger import LoggedRetry, get_logger
+from config import fetch_const
+
+def _build_session() -> requests.Session:
+    session = requests.Session()
+    retry_strategy = LoggedRetry(      # ← changed
+        total=3,
+        backoff_factor=1,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["GET"],
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
 
 from repository.satellite_repo import SatelliteRepository
 from utils.math_helpers import (
@@ -10,12 +26,9 @@ from utils.math_helpers import (
     extract_constellation,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
-CELESTRAK_URL = "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle"
-CACHE_TTL_HOURS = 2.0          # re-fetch if data older than 2 hours
-REQUEST_TIMEOUT_SEC = 30
-MAX_SATELLITES = None          # None = fetch all; set int to limit for testing
+
 
 
 def _parse_tle_text(raw_text: str) -> list[dict]:
@@ -91,7 +104,7 @@ def fetch_and_store_tles(db: Session, force: bool = False) -> dict:
         last_fetch = repo.get_last_fetch_time()
         if last_fetch is not None:
             age = datetime.now(timezone.utc) - last_fetch
-            if age < timedelta(hours=CACHE_TTL_HOURS):
+            if age < timedelta(hours=fetch_const.CACHE_TTL_HOURS):
                 count = repo.count()
                 logger.info(
                     f"TLE cache is fresh ({age.total_seconds()/3600:.1f}h old). "
@@ -103,25 +116,22 @@ def fetch_and_store_tles(db: Session, force: bool = False) -> dict:
                     "source": "cache",
                     "fetched_at": last_fetch,
                 }
+        else:
+            logger.error("last fetch is None")
 
-    logger.info(f"Fetching TLE data from CelesTrak: {CELESTRAK_URL}")
+    logger.info(f"Fetching TLE data from CelesTrak: {fetch_const.CELESTRAK_URL}")
 
     try:
-        response = requests.get(
-            CELESTRAK_URL,
-            timeout=REQUEST_TIMEOUT_SEC,
-            headers={
-                "User-Agent": "GroundPassPredictor/1.0 (educational project)",
-                "Accept": "text/plain",
-            },
-        )
+        session = _build_session()
+        response = session.get(fetch_const.CELESTRAK_URL, timeout=fetch_const.REQUEST_TIMEOUT_SEC, headers={...})
         response.raise_for_status()
-    except requests.exceptions.Timeout:
-        logger.error("CelesTrak request timed out.")
-        raise RuntimeError("TLE fetch timed out. CelesTrak may be unavailable.")
-    except requests.exceptions.RequestException as exc:
-        logger.error(f"CelesTrak fetch failed: {exc}")
-        raise RuntimeError(f"TLE fetch failed: {exc}")
+        logger.info(f"CelesTrak fetch succeeded | status={response.status_code}")
+    except requests.exceptions.RetryError as e:
+        logger.error(f"All retries exhausted | {e}")
+        raise RuntimeError("TLE fetch failed after all retries.")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"CelesTrak fetch failed | {e}")
+        raise RuntimeError(f"TLE fetch failed: {e}")
 
     raw_text = response.text
 
@@ -138,8 +148,8 @@ def fetch_and_store_tles(db: Session, force: bool = False) -> dict:
 
     satellites = _parse_tle_text(raw_text)
 
-    if MAX_SATELLITES:
-        satellites = satellites[:MAX_SATELLITES]
+    if fetch_const.MAX_SATELLITES:
+        satellites = satellites[:fetch_const.MAX_SATELLITES]
 
     if not satellites:
         raise RuntimeError("TLE parsing returned 0 satellites. Check CelesTrak response.")

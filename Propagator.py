@@ -1,12 +1,12 @@
-import logging
 import math
 from datetime import datetime, timezone, timedelta
 from typing import List, Tuple, Optional
 
 import numpy as np
 from sgp4.api import Satrec, WGS84
+from logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 # Propagation window
 PROPAGATION_DAYS = 7
