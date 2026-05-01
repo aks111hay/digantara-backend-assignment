@@ -3,7 +3,7 @@ from sqlalchemy import select, func, and_, update
 from typing import List, Optional
 from datetime import datetime
 
-from app.models.pass_event import PassEvent
+from models.pass_event import PassEvent
 
 
 class PassRepository:

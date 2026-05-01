@@ -1,14 +1,7 @@
 import math
 from datetime import datetime, timezone
 from typing import Tuple
-
-
-# Earth constants
-EARTH_RADIUS_KM = 6371.0
-MU = 398600.4418          # Earth gravitational parameter km³/s²
-J2 = 1.08262668e-3        # J2 perturbation coefficient
-SPEED_OF_LIGHT = 299792.458  # km/s
-
+from config import constants
 
 def degrees_to_radians(deg: float) -> float:
     return math.radians(deg)
@@ -61,9 +54,9 @@ def compute_elevation_azimuth(
     cos_lat, sin_lat = math.cos(lat), math.sin(lat)
     cos_lon, sin_lon = math.cos(lon), math.sin(lon)
 
-    obs_x = (EARTH_RADIUS_KM + obs_alt_km) * cos_lat * cos_lon
-    obs_y = (EARTH_RADIUS_KM + obs_alt_km) * cos_lat * sin_lon
-    obs_z = (EARTH_RADIUS_KM + obs_alt_km) * sin_lat
+    obs_x = (constants.EARTH_RADIUS_KM + obs_alt_km) * cos_lat * cos_lon
+    obs_y = (constants.EARTH_RADIUS_KM + obs_alt_km) * cos_lat * sin_lon
+    obs_z = (constants.EARTH_RADIUS_KM + obs_alt_km) * sin_lat
 
     # Range vector (satellite - observer)
     rx = sat_x - obs_x
@@ -102,9 +95,9 @@ def compute_doppler_shift_hz(
     cos_lat, sin_lat = math.cos(lat), math.sin(lat)
     cos_lon, sin_lon = math.cos(lon), math.sin(lon)
 
-    obs_x = (EARTH_RADIUS_KM + obs_alt_km) * cos_lat * cos_lon
-    obs_y = (EARTH_RADIUS_KM + obs_alt_km) * cos_lat * sin_lon
-    obs_z = (EARTH_RADIUS_KM + obs_alt_km) * sin_lat
+    obs_x = (constants.EARTH_RADIUS_KM + obs_alt_km) * cos_lat * cos_lon
+    obs_y = (constants.EARTH_RADIUS_KM + obs_alt_km) * cos_lat * sin_lon
+    obs_z = (constants.EARTH_RADIUS_KM + obs_alt_km) * sin_lat
 
     rx = sat_x - obs_x
     ry = sat_y - obs_y
@@ -115,7 +108,7 @@ def compute_doppler_shift_hz(
     range_rate = (sat_vx * rx + sat_vy * ry + sat_vz * rz) / r
 
     # Doppler formula: Δf = -f₀ * v_r / c
-    doppler = -carrier_freq_hz * (range_rate / SPEED_OF_LIGHT)
+    doppler = -carrier_freq_hz * (range_rate / constants.SPEED_OF_LIGHT)
     return doppler
 
 

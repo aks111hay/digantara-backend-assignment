@@ -1,12 +1,12 @@
-import logging
+from logger import get_logger
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
 
-from app.repository.pass_repo import PassRepository
-from app.repository.station_repo import StationRepository
+from repository.pass_repo import PassRepository
+from repository.station_repo import StationRepository
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 
 def run_scheduler(

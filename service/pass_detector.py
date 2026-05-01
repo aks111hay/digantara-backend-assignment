@@ -1,22 +1,16 @@
-import logging
+from logger import get_logger
 import math
 from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.orm import Session
 
-from app.repository.satellite_repo import SatelliteRepository
-from app.repository.station_repo import StationRepository
-from app.repository.pass_repo import PassRepository
-from app.service.propagator import propagate_satellite_passes
+from repository.satellite_repo import SatelliteRepository
+from repository.station_repo import StationRepository
+from repository.pass_repo import PassRepository
+from service.propagator import propagate_satellite_passes
+from config import pass_detector
 
-logger = logging.getLogger(__name__)
-
-# Batch size for DB bulk inserts
-INSERT_BATCH_SIZE = 5000
-
-# Batch size for satellite processing (log progress every N satellites)
-LOG_EVERY_N = 100
-
+logger = get_logger()
 
 def _extract_mean_motion(tle_line2: str) -> float:
     """
@@ -86,7 +80,7 @@ def run_pass_detection(
     pending_batch = []
 
     for idx, sat in enumerate(satellites):
-        if idx > 0 and idx % LOG_EVERY_N == 0:
+        if idx > 0 and idx % pass_detector.LOG_EVERY_N == 0:
             elapsed = (datetime.now(timezone.utc) - wall_start).total_seconds()
             logger.info(
                 f"Progress: {idx}/{len(satellites)} satellites | "
@@ -109,7 +103,7 @@ def run_pass_detection(
             total_passes += len(passes)
 
             # Flush to DB in batches to control memory
-            if len(pending_batch) >= INSERT_BATCH_SIZE:
+            if len(pending_batch) >= pass_detector.INSERT_BATCH_SIZE:
                 pass_repo.bulk_insert(pending_batch)
                 pending_batch.clear()
 

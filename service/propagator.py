@@ -1,25 +1,12 @@
-import logging
+from logger import get_logger
 import math
 from datetime import datetime, timezone, timedelta
 from typing import List, Tuple, Optional
-
+from config import propagator
 import numpy as np
 from sgp4.api import Satrec, WGS84
 
-logger = logging.getLogger(__name__)
-
-# Propagation window
-PROPAGATION_DAYS = 7
-
-# Adaptive sampling parameters
-# Coarse scan: period/COARSE_DIVISOR — fast sweep to find candidate windows
-COARSE_DIVISOR = 20
-
-# Fine scan step during binary search (seconds)
-FINE_STEP_SEC = 1.0
-
-# Minimum pass duration to record (seconds)
-MIN_PASS_DURATION_SEC = 5.0
+logger = get_logger()
 
 
 def _build_satrec(tle_line1: str, tle_line2: str) -> Optional[Satrec]:
@@ -246,7 +233,7 @@ def propagate_satellite_passes(
     if start_time is None:
         start_time = datetime.now(timezone.utc)
 
-    end_time = start_time + timedelta(days=PROPAGATION_DAYS)
+    end_time = start_time + timedelta(days=propagator.PROPAGATION_DAYS)
 
     # Adaptive coarse step based on orbital period
     if mean_motion_rev_per_day > 0:
@@ -254,7 +241,7 @@ def propagate_satellite_passes(
     else:
         period_sec = 5400.0  # default 90 min LEO
 
-    coarse_step = timedelta(seconds=period_sec / COARSE_DIVISOR)
+    coarse_step = timedelta(seconds=period_sec / propagator.COARSE_DIVISOR)
 
     all_passes = []
 
@@ -318,7 +305,7 @@ def propagate_satellite_passes(
 
                 duration = (los - pass_start).total_seconds()
 
-                if duration >= MIN_PASS_DURATION_SEC:
+                if duration >= propagator.MIN_PASS_DURATION_SEC:
                     # LOS azimuth
                     los_result = _propagate_to_ecef(sat, los)
                     los_az = None
@@ -329,14 +316,14 @@ def propagate_satellite_passes(
                     max_el_result = _propagate_to_ecef(sat, max_el_time) if max_el_time else None
                     doppler = 0.0
                     if max_el_result:
-                        from app.utils.math_helpers import compute_doppler_shift_hz
+                        from utils.math_helpers import compute_doppler_shift_hz
                         doppler = compute_doppler_shift_hz(
                             max_el_result[3], max_el_result[4], max_el_result[5],
                             max_el_result[0], max_el_result[1], max_el_result[2],
                             obs_lat, obs_lon, obs_alt,
                         )
 
-                    from app.utils.math_helpers import compute_quality_score
+                    from utils.math_helpers import compute_quality_score
                     quality = compute_quality_score(max_el, duration, abs(doppler) / max(duration, 1))
 
                     all_passes.append({
@@ -359,8 +346,8 @@ def propagate_satellite_passes(
         # Handle pass still in progress at end of window
         if in_pass and pass_start:
             duration = (end_time - pass_start).total_seconds()
-            if duration >= MIN_PASS_DURATION_SEC:
-                from app.utils.math_helpers import compute_quality_score
+            if duration >= propagator.MIN_PASS_DURATION_SEC:
+                from utils.math_helpers import compute_quality_score
                 quality = compute_quality_score(max_el, duration)
                 all_passes.append({
                     "satellite_id": satellite_db_id,

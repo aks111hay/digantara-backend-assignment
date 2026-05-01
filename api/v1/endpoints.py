@@ -1,29 +1,37 @@
-import logging
+from logger import get_logger
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 
-from app.db.base import get_db
-from app.models.schemas import (
+from db.base import get_db
+from models.schemas import (
     SatelliteResponse, GroundStationResponse, PassEventResponse,
     FetchResult, PropagationResult, SchedulerResult, NetworkStats,
 )
-from app.repository.satellite_repo import SatelliteRepository
-from app.repository.station_repo import StationRepository
-from app.repository.pass_repo import PassRepository
-from app.service.fetcher import fetch_and_store_tles
-from app.service.pass_detector import run_pass_detection
-from app.service.scheduler import run_scheduler
+from repository.satellite_repo import SatelliteRepository
+from repository.station_repo import StationRepository
+from repository.pass_repo import PassRepository
+from service.fetcher import fetch_and_store_tles
+from service.pass_detector import run_pass_detection
+from service.scheduler import run_scheduler
+from utils.rate_limiter import rate_limit
+from tasks import propagate_task
+from worker import celery_app
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 router = APIRouter()
 
 
 # ── TLE / Data Ingestion ───────────────────────────────────────────────────────
 
-@router.post("/fetch-tles", response_model=FetchResult, tags=["Data Ingestion"])
+@router.post(
+    "/fetch-tles", 
+    response_model=FetchResult, 
+    tags=["Data Ingestion"],
+    dependencies=[Depends(rate_limit(requests=5, window=60))]
+)
 def fetch_tles(
     force: bool = Query(False, description="Force re-fetch even if cache is fresh"),
     db: Session = Depends(get_db),
@@ -44,7 +52,11 @@ def fetch_tles(
 
 # ── Propagation ────────────────────────────────────────────────────────────────
 
-@router.post("/propagate", response_model=PropagationResult, tags=["Propagation"])
+@router.post(
+    "/propagate", 
+    tags=["Propagation"],
+    dependencies=[Depends(rate_limit(requests=2, window=300))]
+)
 def propagate_passes(
     satellite_limit: Optional[int] = Query(
         None, description="Limit satellites for testing (e.g. 100)"
@@ -53,10 +65,8 @@ def propagate_passes(
     db: Session = Depends(get_db),
 ):
     """
-    Run SGP4 propagation for all satellites over all 50 ground stations for 7 days.
-    Stores all pass events (AOS, LOS, max elevation, quality score) in DB.
-
-    ⚠️ Full run (~6000 satellites) takes several minutes. Use satellite_limit for testing.
+    Triggers SGP4 propagation for all satellites as a BACKGROUND task.
+    Returns a task ID that can be used to track progress.
     """
     sat_count = SatelliteRepository(db).count()
     if sat_count == 0:
@@ -65,12 +75,29 @@ def propagate_passes(
             detail="No satellites in DB. Call /fetch-tles first."
         )
 
-    result = run_pass_detection(
-        db=db,
+    # Trigger Celery Task
+    task = propagate_task.delay(
         satellite_limit=satellite_limit,
-        clear_existing=clear_existing,
+        clear_existing=clear_existing
     )
-    return result
+    
+    return {
+        "task_id": task.id,
+        "status": "Accepted",
+        "message": f"Propagation started in background for {satellite_limit} satellites."
+    }
+
+
+@router.get("/propagate/status/{task_id}", tags=["Propagation"])
+def get_propagation_status(task_id: str):
+    """Check the status of a propagation task."""
+    result = celery_app.AsyncResult(task_id)
+    return {
+        "task_id": task_id,
+        "status": result.status,
+        "ready": result.ready(),
+        "result": result.result if result.ready() else None
+    }
 
 
 # ── Scheduling ─────────────────────────────────────────────────────────────────

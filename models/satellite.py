@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
-from app.db.base import Base
+from db.base import Base
 
 
 class Satellite(Base):

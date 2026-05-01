@@ -5,16 +5,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.db.init_db import init_db
-from app.api.v1.endpoints import router as v1_router
+from db.init_db import init_db
+from api.v1.endpoints import router as v1_router
+
+from logger import setup_logging, get_logger
 
 # ── Logging ────────────────────────────────────────────────────────────────────
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)],
-)
-logger = logging.getLogger(__name__)
+setup_logging()
+logger = get_logger()
 
 
 # ── Lifespan ───────────────────────────────────────────────────────────────────
