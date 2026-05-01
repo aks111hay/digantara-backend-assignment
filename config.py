@@ -1,3 +1,4 @@
+import os
 class fetch_const():
     CELESTRAK_URL = "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle"
     CACHE_TTL_HOURS = 2.0          # re-fetch if data older than 2 hours
@@ -28,3 +29,10 @@ class constants():
     MU = 398600.4418          # Earth gravitational parameter km³/s²
     J2 = 1.08262668e-3        # J2 perturbation coefficient
     SPEED_OF_LIGHT = 299792.458  # km/s
+
+class Redisconfig:
+    # Connection settings
+    REDIS_HOST = "localhost"
+    REDIS_PORT = 6379
+    REDIS_DB = 0
+    REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")

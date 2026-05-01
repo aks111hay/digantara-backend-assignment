@@ -26,7 +26,12 @@ from utils.math_helpers import (
     extract_constellation,
 )
 
+from utils.redis_client import redis_client
+
 logger = get_logger()
+
+TLE_LAST_FETCH_KEY = "tle_last_fetch_time"
+TLE_COUNT_KEY = "tle_satellite_count"
 
 
 
@@ -101,29 +106,43 @@ def fetch_and_store_tles(db: Session, force: bool = False) -> dict:
     repo = SatelliteRepository(db)
 
     if not force:
+        # 1. Try Redis first (fastest)
+        last_fetch_str = redis_client.get_cache(TLE_LAST_FETCH_KEY)
+        if last_fetch_str:
+            last_fetch = datetime.fromisoformat(last_fetch_str)
+            age = datetime.now(timezone.utc) - last_fetch
+            if age < timedelta(hours=fetch_const.CACHE_TTL_HOURS):
+                count = redis_client.get_cache(TLE_COUNT_KEY) or repo.count()
+                logger.info(f"TLE cache (Redis) is fresh ({age.total_seconds()/3600:.1f}h old).")
+                return {
+                    "fetched": False,
+                    "satellite_count": int(count),
+                    "source": "cache (redis)",
+                    "fetched_at": last_fetch,
+                }
+
+        # 2. Try DB (fallback)
         last_fetch = repo.get_last_fetch_time()
         if last_fetch is not None:
             age = datetime.now(timezone.utc) - last_fetch
             if age < timedelta(hours=fetch_const.CACHE_TTL_HOURS):
                 count = repo.count()
-                logger.info(
-                    f"TLE cache is fresh ({age.total_seconds()/3600:.1f}h old). "
-                    f"Using {count} cached satellites."
-                )
+                # Update Redis so next time is faster
+                redis_client.set_cache(TLE_LAST_FETCH_KEY, last_fetch.isoformat())
+                redis_client.set_cache(TLE_COUNT_KEY, count)
+                logger.info(f"TLE cache (DB) is fresh ({age.total_seconds()/3600:.1f}h old). Synchronized to Redis.")
                 return {
                     "fetched": False,
                     "satellite_count": count,
-                    "source": "cache",
+                    "source": "cache (db)",
                     "fetched_at": last_fetch,
                 }
-        else:
-            logger.error("last fetch is None")
 
     logger.info(f"Fetching TLE data from CelesTrak: {fetch_const.CELESTRAK_URL}")
 
     try:
         session = _build_session()
-        response = session.get(fetch_const.CELESTRAK_URL, timeout=fetch_const.REQUEST_TIMEOUT_SEC, headers={...})
+        response = session.get(fetch_const.CELESTRAK_URL, timeout=fetch_const.REQUEST_TIMEOUT_SEC, headers={})
         response.raise_for_status()
         logger.info(f"CelesTrak fetch succeeded | status={response.status_code}")
     except requests.exceptions.RetryError as e:
@@ -158,9 +177,14 @@ def fetch_and_store_tles(db: Session, force: bool = False) -> dict:
     count = repo.upsert_many(satellites)
     logger.info(f"Upserted {count} satellites.")
 
+    # Update Redis cache
+    now = datetime.now(timezone.utc)
+    redis_client.set_cache(TLE_LAST_FETCH_KEY, now.isoformat())
+    redis_client.set_cache(TLE_COUNT_KEY, count)
+
     return {
         "fetched": True,
         "satellite_count": count,
         "source": "celestrak",
-        "fetched_at": datetime.now(timezone.utc),
+        "fetched_at": now,
     }
