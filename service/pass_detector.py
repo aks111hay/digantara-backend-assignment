@@ -4,10 +4,10 @@ from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.orm import Session
 
-from app.repository.satellite_repo import SatelliteRepository
-from app.repository.station_repo import StationRepository
-from app.repository.pass_repo import PassRepository
-from app.service.propagator import propagate_satellite_passes
+from repository.satellite_repo import SatelliteRepository
+from repository.station_repo import StationRepository
+from repository.pass_repo import PassRepository
+from service.propagator import propagate_satellite_passes
 
 logger = logging.getLogger(__name__)
 

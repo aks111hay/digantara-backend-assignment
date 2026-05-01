@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session
-from app.db.base import Base, engine
-from app.models import satellite, ground_station, pass_event  # noqa: F401 — ensures models are registered
-from app.utils.ground_stations import GROUND_STATIONS
-from app.models.ground_station import GroundStation
+from db.base import Base, engine
+from models import satellite, ground_station, pass_event  # noqa: F401 — ensures models are registered
+from utils.ground_stations import GROUND_STATIONS
+from models.ground_station import GroundStation
 import logging
 
 logger = logging.getLogger(__name__)

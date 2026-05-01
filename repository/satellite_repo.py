@@ -3,7 +3,7 @@ from sqlalchemy import select
 from typing import List, Optional
 from datetime import datetime, timezone
 
-from app.models.satellite import Satellite
+from models.satellite import Satellite
 
 
 class SatelliteRepository:

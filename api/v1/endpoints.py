@@ -5,17 +5,17 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 
-from app.db.base import get_db
-from app.models.schemas import (
+from db.base import get_db
+from models.schemas import (
     SatelliteResponse, GroundStationResponse, PassEventResponse,
     FetchResult, PropagationResult, SchedulerResult, NetworkStats,
 )
-from app.repository.satellite_repo import SatelliteRepository
-from app.repository.station_repo import StationRepository
-from app.repository.pass_repo import PassRepository
-from app.service.fetcher import fetch_and_store_tles
-from app.service.pass_detector import run_pass_detection
-from app.service.scheduler import run_scheduler
+from repository.satellite_repo import SatelliteRepository
+from repository.station_repo import StationRepository
+from repository.pass_repo import PassRepository
+from service.fetcher import fetch_and_store_tles
+from service.pass_detector import run_pass_detection
+from service.scheduler import run_scheduler
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

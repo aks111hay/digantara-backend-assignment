@@ -3,8 +3,8 @@ import requests
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
 
-from app.repository.satellite_repo import SatelliteRepository
-from app.utils.math_helpers import (
+from repository.satellite_repo import SatelliteRepository
+from utils.math_helpers import (
     tle_epoch_to_datetime,
     classify_confidence,
     extract_constellation,

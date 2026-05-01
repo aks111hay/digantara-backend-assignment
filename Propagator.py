@@ -329,14 +329,14 @@ def propagate_satellite_passes(
                     max_el_result = _propagate_to_ecef(sat, max_el_time) if max_el_time else None
                     doppler = 0.0
                     if max_el_result:
-                        from app.utils.math_helpers import compute_doppler_shift_hz
+                        from utils.math_helpers import compute_doppler_shift_hz
                         doppler = compute_doppler_shift_hz(
                             max_el_result[3], max_el_result[4], max_el_result[5],
                             max_el_result[0], max_el_result[1], max_el_result[2],
                             obs_lat, obs_lon, obs_alt,
                         )
 
-                    from app.utils.math_helpers import compute_quality_score
+                    from utils.math_helpers import compute_quality_score
                     quality = compute_quality_score(max_el, duration, abs(doppler) / max(duration, 1))
 
                     all_passes.append({
@@ -360,7 +360,7 @@ def propagate_satellite_passes(
         if in_pass and pass_start:
             duration = (end_time - pass_start).total_seconds()
             if duration >= MIN_PASS_DURATION_SEC:
-                from app.utils.math_helpers import compute_quality_score
+                from utils.math_helpers import compute_quality_score
                 quality = compute_quality_score(max_el, duration)
                 all_passes.append({
                     "satellite_id": satellite_db_id,

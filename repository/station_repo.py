@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 from typing import List, Optional
 
-from app.models.ground_station import GroundStation
+from models.ground_station import GroundStation
 
 
 class StationRepository:
